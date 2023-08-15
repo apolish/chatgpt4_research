@@ -1,0 +1,98 @@
+REQUEST 1:
+1. Read the following three CSV files "transactions.csv", "country_abbreviation.csv", and "accounts.csv" in Scala in Apache Spark. The schema of the fields in the "transactions.csv" file is the next: [id: integer; amount: double; account_type: string; transaction_date: date; country: string]. The schema of the fields in the "country_abbreviation.csv" file is the next: [country_full_name: string; abbreviation: string]. The schema of the fields in the "accounts.csv" file is the next: [id: integer; first_name: string; last_name: string; age: integer; country: string].
+2. Calculate total earnings (sum of transactions above 0) for each user from Switzerland by year as a pivot table. The result dataframe should contain user full names as one field split by whitespace, years, and earning values.
+
+RESPONSE 1:
+You can achieve the above requirements using Scala in Apache Spark. Here's the step-by-step code to guide you through the process:
+
+Read the CSV files:
+
+import org.apache.spark.sql.SparkSession
+
+val spark: SparkSession = SparkSession.builder
+    .appName("Spark CSV Analysis")
+    .getOrCreate()
+
+// Read transactions.csv
+val transactionsDF = spark.read
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .csv("path_to/transactions.csv")
+
+// Read country_abbreviation.csv
+val countryAbbrDF = spark.read
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .csv("path_to/country_abbreviation.csv")
+
+// Read accounts.csv
+val accountsDF = spark.read
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .csv("path_to/accounts.csv")
+
+Calculate total earnings for each user from Switzerland by year:
+
+import org.apache.spark.sql.functions._
+
+// Join the transactions and accounts dataframes on 'id' and filter out the earnings greater than 0
+val earningsDF = transactionsDF
+    .join(accountsDF, "id")
+    .filter(col("amount") > 0)
+
+// Join with country abbreviation dataframe to get full country names
+val withFullCountryDF = earningsDF
+    .join(countryAbbrDF, earningsDF("country") === countryAbbrDF("abbreviation"))
+
+// Filter out users from Switzerland
+val swissEarningsDF = withFullCountryDF.filter(col("country_full_name") === "Switzerland")
+
+// Calculate yearly earnings
+val yearlyEarningsDF = swissEarningsDF.groupBy(concat(col("first_name"), lit(" "), col("last_name")).alias("full_name"), year(col("transaction_date")).alias("year"))
+    .agg(sum("amount").alias("earnings"))
+
+// Pivot the dataframe on 'year'
+val pivotDF = yearlyEarningsDF.groupBy("full_name").pivot("year").agg(sum("earnings"))
+
+pivotDF.show()
+
+This will give you the desired pivot table with user full names as one field split by whitespace, years, and earning values for users from Switzerland. Adjust the path_to in the file reading section to the appropriate paths of your files.
+
+REQUEST 2:
+Correct the previous second example of code because I got the following exception: "Reference `country` is ambiguous, could be: [`country`, `country`].".
+
+RESPONSE 2:
+The error "Reference country is ambiguous" arises because after joining, there are two columns with the same name "country" in the resulting dataframe - one from transactionsDF and one from accountsDF.
+
+To fix this, you should specify from which dataframe you are referencing the column, especially when performing joins. Here's a corrected version:
+
+import org.apache.spark.sql.functions._
+
+// Join the transactions and accounts dataframes on 'id' and filter out the earnings greater than 0
+val earningsDF = transactionsDF
+    .join(accountsDF, transactionsDF("id") === accountsDF("id"))
+    .filter(col("amount") > 0)
+    .drop(accountsDF("id")) // Drop duplicate 'id' column
+
+// Note: You should also resolve the country column conflict. Here, I'm keeping the country from transactionsDF
+// You might adjust this according to your needs
+.drop(accountsDF("country"))
+
+// Join with country abbreviation dataframe to get full country names
+val withFullCountryDF = earningsDF
+    .join(countryAbbrDF, earningsDF("country") === countryAbbrDF("abbreviation"))
+
+// Filter out users from Switzerland
+val swissEarningsDF = withFullCountryDF.filter(col("country_full_name") === "Switzerland")
+
+// Calculate yearly earnings
+val yearlyEarningsDF = swissEarningsDF.groupBy(concat(col("first_name"), lit(" "), col("last_name")).alias("full_name"), year(col("transaction_date")).alias("year"))
+    .agg(sum("amount").alias("earnings"))
+
+// Pivot the dataframe on 'year'
+val pivotDF = yearlyEarningsDF.groupBy("full_name").pivot("year").agg(sum("earnings"))
+
+pivotDF.show()
+
+The main changes include using transactionsDF("id") and accountsDF("id") to distinguish between the 'id' columns from the two dataframes during the join, and similarly for the country column. Also, after joining, it's a good practice to drop duplicate or unnecessary columns using the drop method.
+
