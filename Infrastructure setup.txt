@@ -1,0 +1,84 @@
+REQUEST 1:
+How to print the count of records from CSV file in Scala programming language in Apache Spark?
+
+RESPONSE 1:
+Certainly! You can count the number of records in a CSV file using Apache Spark in Scala by following these steps:
+
+Import the Necessary Libraries: You'll need to import the libraries related to Spark and Spark SQL.
+
+Initialize a SparkSession: This will be the entry point for any functionality related to Spark.
+
+Read the CSV File: You can use the read method followed by csv to read the file.
+
+Count the Records: You can use the count method to get the number of records in the DataFrame.
+
+Here's a simple example:
+
+import org.apache.spark.sql.SparkSession
+
+object CSVCount {
+  def main(args: Array[String]): Unit = {
+    // Initialize SparkSession
+    val spark = SparkSession.builder()
+      .appName("CSV Record Count")
+      .master("local[*]") // Use local mode; replace with your cluster configuration if needed
+      .getOrCreate()
+
+    // Read CSV file
+    val csvFilePath = "path/to/yourfile.csv" // Replace with your CSV file path
+    val df = spark.read.option("header", "true").csv(csvFilePath)
+
+    // Count the records
+    val recordCount = df.count()
+
+    println(s"Number of Records: $recordCount")
+
+    // Stop the SparkSession
+    spark.stop()
+  }
+}
+
+Make sure to replace "path/to/yourfile.csv" with the actual path to the CSV file you want to read.
+
+The option "header", "true" assumes that the CSV file has a header. If it does not, you can set this option to false.
+
+This code will print the number of records in the CSV file to the console.
+
+REQUEST 2:
+How to print the count of records from three CSV files in one cycle in Scala programming language in Apache Spark?
+
+RESPONSE 2:
+You can read and count the records from multiple CSV files in a loop. Here's how you can count the records from three CSV files in one cycle using Apache Spark in Scala:
+
+import org.apache.spark.sql.SparkSession
+
+object CSVCount {
+  def main(args: Array[String]): Unit = {
+    // Initialize SparkSession
+    val spark = SparkSession.builder()
+      .appName("CSV Record Count")
+      .master("local[*]") // Use local mode; replace with your cluster configuration if needed
+      .getOrCreate()
+
+    // List of CSV file paths
+    val csvFilePaths = Seq(
+      "path/to/yourfile1.csv",
+      "path/to/yourfile2.csv",
+      "path/to/yourfile3.csv"
+    )
+
+    // Iterate through the list of CSV files and count the records
+    csvFilePaths.foreach { filePath =>
+      val df = spark.read.option("header", "true").csv(filePath)
+      val recordCount = df.count()
+      println(s"Number of Records in $filePath: $recordCount")
+    }
+
+    // Stop the SparkSession
+    spark.stop()
+  }
+}
+
+Make sure to replace "path/to/yourfile1.csv", "path/to/yourfile2.csv", and "path/to/yourfile3.csv" with the actual paths to the CSV files you want to read.
+
+This code will print the number of records in each of the three CSV files to the console.
