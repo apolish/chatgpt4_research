@@ -1,0 +1,115 @@
+REQUEST 1:
+Write function in Scala programming language using Apache Spark SQL API to:
+Calculate how many accounts of each type there are in "transactions.csv" file using Spark SQL. The return type is a dataframe [account_type: string, account_type_count: int]. Before, create dataframe with the following schema:
+id: integer;
+amount: double;
+account_type: string;
+transaction_date: date;
+country: string;
+
+RESPONSE 1:
+Certainly! To read the "transactions.csv" file with a specific schema and calculate the count of accounts by account_type, you can use the following code:
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions._
+
+object AccountTypeCount {
+  def main(args: Array[String]): Unit = {
+    // Initialize SparkSession
+    val spark = SparkSession.builder()
+      .appName("Account Type Count")
+      .master("local[*]") // Use local mode; replace with your cluster configuration if needed
+      .getOrCreate()
+
+    // Call the function to calculate the count of account types
+    val accountCounts = calculateAccountTypes(spark, "path/to/transactions.csv")
+
+    // Show the result
+    accountCounts.show()
+
+    // Stop the SparkSession
+    spark.stop()
+  }
+
+  def calculateAccountTypes(spark: SparkSession, filePath: String): DataFrame = {
+    // Define the schema
+    val schema = StructType(List(
+      StructField("id", IntegerType, nullable = true),
+      StructField("amount", DoubleType, nullable = true),
+      StructField("account_type", StringType, nullable = true),
+      StructField("transaction_date", DateType, nullable = true),
+      StructField("country", StringType, nullable = true)
+    ))
+
+    // Read CSV file with the specified schema
+    val transactionsDF = spark.read
+      .option("header", "true")
+      .schema(schema)
+      .csv(filePath)
+
+    // Register the DataFrame as a SQL temporary view
+    transactionsDF.createOrReplaceTempView("transactions")
+
+    // Execute SQL query to group by account_type and count
+    val result = spark.sql(
+      "SELECT account_type, COUNT(*) as account_type_count " +
+        "FROM transactions " +
+        "GROUP BY account_type"
+    )
+
+    result
+  }
+}
+
+In this code:
+
+The schema for the CSV file is defined explicitly using the StructType and StructField classes with the required data types.
+The calculateAccountTypes function reads the CSV file using the specified schema and creates a temporary SQL view named "transactions."
+A SQL query is executed to group the records by the account_type column and count the number of occurrences for each type.
+Make sure to replace "path/to/transactions.csv" with the actual path to your CSV file.
+
+The resulting DataFrame will have the schema [account_type: string, account_type_count: int], as requested.
+
+REQUEST 2:
+Write function in Scala programming language using Apache Spark SQL API to:
+Calculate only the balance and the latest date for each account type from "transactions.csv". To calculate the balance, summarize all the transactions for each account type. The return type is a dataframe [acount_type: string, amount: double, latest_date: date].
+
+RESPONSE 2:
+Certainly! To achieve this using Apache Spark SQL API in Scala, you'd usually follow these steps:
+
+Read the CSV file into a DataFrame.
+Use Spark SQL transformations like groupBy, agg to compute the desired outputs.
+Return the resulting DataFrame.
+Here's how you might write the function:
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
+
+def calculateBalance(spark: SparkSession, filePath: String): DataFrame = {
+  // Read the CSV file
+  val transactions = spark.read
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .csv(filePath)
+
+  // Assuming the transactions.csv has columns "account_type", "amount", and "date"
+  val result = transactions
+    .groupBy("account_type")
+    .agg(
+      sum("amount").alias("amount"),
+      max("date").alias("latest_date")
+    )
+
+  result
+}
+
+// Usage:
+// val spark = SparkSession.builder.appName("CalculateBalance").getOrCreate()
+// val resultDf = calculateBalance(spark, "path/to/transactions.csv")
+// resultDf.show()
+
+This function assumes that the CSV file has a header with at least the following columns: account_type, amount, and date. The function computes the total amount for each account_type and also gets the latest date for each account_type.
+
+Make sure to handle potential schema mismatches or discrepancies in the data for production code.
+
