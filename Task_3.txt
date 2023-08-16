@@ -1,0 +1,48 @@
+REQUEST 1:
+1. Read the following CSV file "transactions.csv" in Scala in Apache Spark. The schema of the fields in the "transactions.csv" file is the next: [id: integer; amount: double; account_type: string; transaction_date: date; country: string].
+2. Write a function that expects a transactions dataset as input and returns it with an additional column "level". The value of "level " is calculated based on the "amount" column as:
+Top 25% of all transactions get a value "high";
+The next 50% of all transactions get "average";
+The rest gets "low";
+
+RESPONSE 1:
+To achieve this, you can first calculate the quantile values for the "amount" column and then use those quantiles to determine the levels for each transaction. Here's how you can achieve this:
+
+Read the "transactions.csv" file:
+
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+
+val spark: SparkSession = SparkSession.builder
+    .appName("Spark CSV Analysis")
+    .getOrCreate()
+
+// Read transactions.csv
+val transactionsDF = spark.read
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .csv("path_to/transactions.csv")
+
+
+Create the function to determine the levels:
+
+def assignTransactionLevel(transactions: DataFrame): DataFrame = {
+    // Calculate quantiles
+    val quantiles = transactions.stat.approxQuantile("amount", Array(0.25, 0.75), 0.0)
+    val lowerQuantile = quantiles(0)
+    val upperQuantile = quantiles(1)
+
+    // Assign levels based on quantiles
+    transactions.withColumn("level", 
+        when(col("amount") > upperQuantile, "high")
+        .when(col("amount") <= upperQuantile && col("amount") > lowerQuantile, "average")
+        .otherwise("low"))
+}
+
+// Using the function
+val transactionsWithLevel = assignTransactionLevel(transactionsDF)
+transactionsWithLevel.show()
+
+In this solution, the approxQuantile method calculates the quantiles. It expects three parameters: the column name, an array of probabilities (0.25 and 0.75 in this case), and a relative error tolerance (set to 0.0 for exact quantile computation).
+
+The computed quantiles are then used to define conditions with the when function to assign "high", "average", or "low" to the "level" column.
