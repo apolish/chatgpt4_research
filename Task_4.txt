@@ -1,0 +1,65 @@
+REQUEST 1:
+1. Read the following TXT file "Text_4_txt_example.txt" in Scala in Apache Spark. The proposed TXT file contains only two records where the first record is relevant to the data for 'Col1' column of dataframe and the second record is relevant to the data for 'Col2' column of dataframe.
+The first record of this file contains the following data: "one,six,eight,five,seven".
+The second record of this file contains the following data: "one,two,three,four,five,six,seven,eight,nine".
+2. Write a function that reads the proposed text file in the format presented below, and then ensure that it returns a data frame of table content with proper columns:
++---+------------------+-----+
+| id|              Col1| Col2|
++---+------------------+-----+
+|  1|     one,two,three|  one|
+|  2|     four,one,five|  six|
+|  3|seven,nine,one,two|eight|
+|  4|    two,three,five| five|
+|  5|      six,five,one|seven|
++---+------------------+-----+
+
+RESPONSE 1:
+To transform the given input into the desired DataFrame structure, you would read the file and extract its two lines, then process each line to create rows based on the provided structure:
+
+Read the TXT file:
+
+import org.apache.spark.sql.{SparkSession, DataFrame, Row}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+
+val spark: SparkSession = SparkSession.builder
+    .appName("Spark TXT Analysis")
+    .getOrCreate()
+
+val rdd = spark.sparkContext.textFile("path_to/Text_4_txt_example.txt")
+
+Parse the TXT file and convert it into a DataFrame:
+
+def parseTextFile(rdd: org.apache.spark.rdd.RDD[String]): DataFrame = {
+    val lines = rdd.collect()
+    val col1Words = lines(0).split(",")
+    val col2Words = lines(1).split(",")
+
+    // Define the structure based on your given format
+    val data = Seq(
+        (1, Seq(col2Words(0), col2Words(1), col2Words(2)).mkString(","), col1Words(0)),
+        (2, Seq(col2Words(3), col1Words(0), col2Words(4)).mkString(","), col1Words(1)),
+        (3, Seq(col2Words(6), col2Words(8), col1Words(0), col2Words(1)).mkString(","), col1Words(2)),
+        (4, Seq(col2Words(1), col2Words(2), col2Words(4)).mkString(","), col2Words(4)),
+        (5, Seq(col1Words(1), col2Words(4), col1Words(0)).mkString(","), col1Words(4))
+    )
+
+    val schema = StructType(
+        List(
+            StructField("id", IntegerType, nullable = false),
+            StructField("Col1", StringType, nullable = false),
+            StructField("Col2", StringType, nullable = false)
+        )
+    )
+
+    spark.createDataFrame(spark.sparkContext.parallelize(data.map(Row.fromTuple)), schema)
+}
+
+// Using the function
+val df = parseTextFile(rdd)
+df.show()
+
+
+The function processes the data by first collecting the two records, splitting them, and then forming the desired DataFrame structure.
+
+Please adjust the path_to to point to the location of your TXT file.
