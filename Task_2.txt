@@ -96,3 +96,124 @@ pivotDF.show()
 
 The main changes include using transactionsDF("id") and accountsDF("id") to distinguish between the 'id' columns from the two dataframes during the join, and similarly for the country column. Also, after joining, it's a good practice to drop duplicate or unnecessary columns using the drop method.
 
+REQUEST 3:
+Optimize the following PySpark code to reduce many Spark actions:
+
+from pyspark.sql import SparkSession
+
+path_to = "input_csv_files/"
+
+# Initialize Spark session
+spark = SparkSession.builder \
+    .appName("Spark CSV Analysis") \
+    .getOrCreate()
+
+# Read transactions.csv
+transactionsDF = spark.read \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("delimiter", ";") \
+    .csv(path_to + "transactions.csv")
+
+# Read country_abbreviation.csv
+countryAbbrDF = spark.read \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("delimiter", ";") \
+    .csv(path_to + "country_abbreviation.csv")
+
+# Read accounts.csv
+accountsDF = spark.read \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("delimiter", ";") \
+    .csv(path_to + "accounts.csv")
+
+from pyspark.sql.functions import col, concat, lit, year, sum
+
+# Join the transactions and accounts dataframes on 'id' and filter out the earnings greater than 0
+earningsDF = transactionsDF \
+    .join(accountsDF, transactionsDF["id"] == accountsDF["id"]) \
+    .filter(col("amount") > 0) \
+    .drop(accountsDF["id"]) # Drop duplicate 'id' column
+
+# Note: You should also resolve the country column conflict. Here, I'm keeping the country from transactionsDF
+# You might adjust this according to your needs
+earningsDF = earningsDF.drop(accountsDF["country"])
+
+# Join with country abbreviation dataframe to get full country names
+withFullCountryDF = earningsDF \
+    .join(countryAbbrDF, earningsDF["country"] == countryAbbrDF["abbreviation"])
+
+# Filter out users from Switzerland
+swissEarningsDF = withFullCountryDF.filter(col("country_full_name") == "Switzerland")
+
+# Calculate yearly earnings
+yearlyEarningsDF = swissEarningsDF.groupBy(
+    concat(col("first_name"), lit(" "), col("last_name")).alias("full_name"),
+    year(col("transaction_date")).alias("year")) \
+    .agg(sum("amount").alias("earnings"))
+
+# Pivot the dataframe on 'year'
+pivotDF = yearlyEarningsDF.groupBy("full_name").pivot("year").agg(sum("earnings"))
+
+pivotDF.show()
+
+RESPONSE 3:
+To optimize the provided PySpark code:
+
+Minimize the number of transformations.
+Avoid dropping columns unless necessary.
+Do the required filtering early in the transformations to reduce the amount of data being processed.
+Consolidate Spark read options for code clarity.
+Here's an optimized version:
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, concat, lit, year, sum
+
+path_to = "input_csv_files/"
+
+# Initialize Spark session
+spark = SparkSession.builder \
+    .appName("Spark CSV Analysis") \
+    .getOrCreate()
+
+# Consolidate read options for simplicity
+def read_spark_csv(path):
+    return spark.read \
+        .option("header", "true") \
+        .option("inferSchema", "true") \
+        .option("delimiter", ";") \
+        .csv(path)
+
+# Read CSV files
+transactionsDF = read_spark_csv(path_to + "transactions.csv")
+countryAbbrDF = read_spark_csv(path_to + "country_abbreviation.csv")
+accountsDF = read_spark_csv(path_to + "accounts.csv")
+
+# Join transactionsDF and accountsDF with only required columns and perform filter operation
+filteredDF = transactionsDF.filter(col("amount") > 0) \
+    .select("id", "amount", "transaction_date", "country") \
+    .join(accountsDF.select("id", "first_name", "last_name"), "id")
+
+# Join with country abbreviation dataframe and filter for Swiss users
+swissEarningsDF = filteredDF \
+    .join(countryAbbrDF, filteredDF["country"] == countryAbbrDF["abbreviation"]) \
+    .filter(col("country_full_name") == "Switzerland")
+
+# Calculate yearly earnings and pivot on 'year'
+pivotDF = swissEarningsDF.groupBy(
+    concat(col("first_name"), lit(" "), col("last_name")).alias("full_name"),
+    year(col("transaction_date")).alias("year")) \
+    .agg(sum("amount").alias("earnings")) \
+    .groupBy("full_name").pivot("year").agg(sum("earnings"))
+
+pivotDF.show()
+
+Optimizations performed:
+
+1. Combined and condensed the Spark read options into a function (read_spark_csv) to improve code readability.
+2. Instead of dropping columns post-join, we select only necessary columns before joining, which can potentially reduce shuffle data.
+3. Moved the filtering for positive amounts before joining to reduce the rows being joined.
+4. Combined the aggregation and pivoting operations, further reducing the number of stages.
+5. Always ensure the optimized code produces the same result as the original for correctness.
